@@ -1,0 +1,131 @@
+---
+title: "Analyze Sales"
+subtitle: "CS5200 Practicum I"
+author: "Lolla, M"
+date: "03/05/2025"
+output: pdf_document
+---
+
+
+Code by Mahimanjali Lolla. 
+
+```{r  SetCRANMirror, echo=FALSE}
+chooseCRANmirror(graphics = FALSE, ind = 1)
+```
+
+
+```{r installPackages, include=FALSE}
+suppressMessages(suppressWarnings({
+  install.packages("rmarkdown", quiet = TRUE)
+  install.packages("knitr", quiet = TRUE)
+  install.packages("kableExtra", quiet = TRUE)
+  install.packages("tinytex", quiet = TRUE)
+  install.packages("ggplot2", quiet = TRUE)
+}))
+
+
+```
+
+
+```{r LoadRequiredLibraries, echo=FALSE, message=FALSE, warning=FALSE}
+# Load required libraries
+library(knitr)
+library(kableExtra)
+library(DBI)
+library(RMySQL)
+library(ggplot2)
+library(dplyr)
+```
+
+```{r ConnecttoMySQLDatabase, include=FALSE}
+# Connect to MySQL database
+suppressMessages({
+  suppressWarnings({
+con <- dbConnect(RMySQL::MySQL(),
+                 dbname = "cs5200_practicum",
+                 host = "db4free.net",
+                 port = 3306,
+                 user = "mahimalolla",
+                 password = "2ei#QFX.cUMCTQp")
+  })
+})
+print("Connected to MySQL database.")
+```
+
+
+**Analysis by Restaurant**
+```{r AnalysisbyRestaurant , echo=FALSE, message=FALSE, warning=FALSE}
+# SQL Query to retrieve analysis by restaurant
+query_restaurant <- "
+SELECT r.restaurant_name, 
+       COUNT(v.visit_id) AS total_visits, 
+       COUNT(DISTINCT v.customer_id) AS unique_customers,
+       SUM(CASE WHEN c.loyalty_program = 1 THEN 1 ELSE 0 END) AS loyalty_customers,
+       SUM(v.food_bill) AS total_food_revenue, 
+       SUM(v.alcohol_bill) AS total_alcohol_revenue
+FROM Visits v
+JOIN Restaurants r ON v.restaurant_id = r.restaurant_id
+JOIN Customers c ON v.customer_id = c.customer_id
+GROUP BY r.restaurant_name
+ORDER BY total_visits DESC;
+"
+
+# Fetch data from MySQL
+df_restaurant <- dbGetQuery(con, query_restaurant)
+
+# Display formatted table
+if(nrow(df_restaurant) > 0) {
+  kable(df_restaurant, format = "latex", booktabs = TRUE, align = "c", caption = "Restaurant Sales Analysis") %>%
+    kable_styling(latex_options = c("striped", "hold_position"))
+} else {
+  print("No data available for restaurant analysis.")
+}
+```
+ 
+ 
+**Analysis by Year**
+```{r AnalysisbYear, echo=FALSE, message=FALSE, warning=FALSE}
+# SQL Query to retrieve yearly analysis
+query_yearly <- "
+SELECT YEAR(v.visit_date) AS year, 
+       SUM(v.food_bill + v.alcohol_bill) AS total_revenue,
+       AVG(v.food_bill + v.alcohol_bill) AS avg_per_party,
+       AVG(v.party_size) AS avg_party_size
+FROM Visits v
+GROUP BY year
+ORDER BY year;
+"
+
+# Fetch data from MySQL
+df_yearly <- dbGetQuery(con, query_yearly)
+
+# Display formatted table
+if(nrow(df_yearly) > 0) {
+  kable(df_yearly, format = "latex", booktabs = TRUE, align = "c", caption = "Yearly Sales Analysis") %>%
+    kable_styling(latex_options = c("striped", "hold_position"))
+} else {
+  print("No data available for yearly analysis.")
+}
+```
+
+
+**Trend by Year**
+```{r TotalRevenueTrendbyYear (Line Graph), echo=FALSE, message=FALSE, warning=FALSE}
+# Create a line chart for Year vs. Total Revenue
+plot(df_yearly$year, df_yearly$total_revenue, type = "o", col = "blue",
+     main = "Total Revenue Trend by Year",
+     xlab = "Year", ylab = "Total Revenue",
+     pch = 16, lwd = 2)
+
+# Add data labels in red
+text(df_yearly$year, df_yearly$total_revenue, 
+     labels = round(df_yearly$total_revenue, 2), 
+     pos = 3, cex = 0.8, col = "red")
+
+```
+
+
+
+
+
+
